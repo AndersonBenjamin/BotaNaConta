@@ -282,6 +282,20 @@ Abrir site → Login → Dashboard → + Novo gasto → Valor → Categoria
 
 Esse fluxo deve ser **extremamente rápido** e exigir poucos toques.
 
+### Rotas do frontend
+
+| Rota           | Tela                                  |
+| -------------- | ------------------------------------- |
+| `/login`       | Login (única rota pública)            |
+| `/`            | Dashboard                             |
+| `/novo`        | Novo gasto                            |
+| `/gastos`      | Lista com filtros (`?periodo=&categoria=`) |
+| `/gastos/:id`  | Editar / excluir gasto                |
+| `/resumo`      | Resumo mensal por categoria           |
+
+- Sem sessão, qualquer rota leva ao `/login`; após entrar, o usuário volta para a rota que tentou abrir.
+- O token fica no `localStorage` (`botanaconta.token`). Se a API responder `401` (token expirado), o app descarta o token e volta ao login.
+
 ### 8.1 Login
 
 - E-mail e senha.
@@ -314,25 +328,25 @@ Gastos recentes
 
 | Campo       | Comportamento                                                                 |
 | ----------- | ----------------------------------------------------------------------------- |
-| Valor       | Numérico, formato `R$ 35,90`. Abre **teclado numérico** (`inputmode="decimal"`). Foco automático ao abrir a tela. |
-| Categoria   | Botões rápidos com emoji (ou select).                                          |
+| Valor       | Formato `R$ 35,90`, com **dígitos entrando pela direita** (digitar `3590` mostra `35,90`), então só precisa do **teclado numérico** (`inputmode="numeric"`). Foco automático ao abrir a tela e de novo se o salvamento falhar por falta de valor. |
+| Categoria   | Grade de botões com emoji.                                                     |
 | Descrição   | Opcional. Ex.: `Almoço`.                                                       |
 | Data        | Preenchida com a data atual; pode ser alterada.                                |
 | Botão       | **Adicionar gasto**                                                            |
 
 Após salvar:
 
-1. Limpar o formulário.
-2. Mostrar confirmação (ex.: toast "Gasto registrado").
-3. Voltar para o dashboard ou lista.
+1. Mostrar confirmação (toast "Gasto registrado").
+2. Voltar para o dashboard (o formulário é descartado).
 
-A mesma tela/formulário é reaproveitada para **editar** um gasto, com opção de **excluir** (pedindo confirmação).
+A mesma tela/formulário é reaproveitada para **editar** um gasto, com opção de **excluir** (pedindo confirmação). Ao salvar ou excluir, volta para a tela anterior, mantendo os filtros da lista.
 
 ### 8.4 Lista de gastos
 
 - Mostra descrição, categoria, valor e data.
 - Ordenada do **mais recente para o mais antigo**.
-- Agrupada por dia.
+- Agrupada por dia, com os títulos "Hoje", "Ontem" ou a data (`02 OUT`; o ano aparece quando não é o atual).
+- Mostra a quantidade e a soma dos gastos filtrados.
 - Tocar em um item abre a edição.
 
 ```text
@@ -346,12 +360,14 @@ A mesma tela/formulário é reaproveitada para **editar** um gasto, com opção 
 
 ### 8.5 Filtros
 
-- **Período:** Hoje · Esta semana · Este mês · Mês anterior
+- **Período:** Hoje · Esta semana · Este mês *(padrão)* · Mês anterior
 - **Categoria:** seleção de uma categoria (ou todas)
+- A semana vai de segunda a domingo. Os períodos são calculados no fuso America/Sao_Paulo, o mesmo da API.
+- Os filtros ficam na URL, para continuarem aplicados ao voltar da edição.
 
 ### 8.6 Resumo mensal
 
-Total gasto por categoria no mês, sem gráficos complexos.
+Total gasto por categoria no mês atual, do maior para o menor, com uma barra simples indicando a proporção de cada categoria. Tocar numa categoria abre a lista do mês filtrada por ela.
 
 ```text
 Gastos de Outubro
@@ -495,7 +511,7 @@ Retorna os números do período atual:
 }
 ```
 
-- `today` e `month` informam a data de referência usada pela API, para o frontend exibir o mês e montar os filtros sem depender do relógio do celular.
+- `today` e `month` informam a data de referência usada pela API nos totais; o frontend usa `month` para exibir o nome do mês.
 - `recentExpenses`: os 10 gastos mais recentes.
 - `byCategory`: total do mês por categoria, do maior para o menor; categorias sem gastos no mês não aparecem.
 
@@ -543,7 +559,7 @@ Retorna os números do período atual:
 
 ## 11. Interface mobile
 
-Prioridade para celular, com largura de referência entre **360px e 430px**. A estética (cores, fontes, tema) ainda será definida.
+Prioridade para celular, com largura de referência entre **360px e 430px**. A estética definitiva (cores, fontes) ainda será escolhida; por enquanto há um visual neutro com todas as cores, raios e espaçamentos em variáveis CSS no início de `frontend/src/styles/global.css`, incluindo um **modo escuro** que segue a configuração do celular. Em telas maiores, o conteúdo fica centralizado com até 480px.
 
 A interface deve:
 
