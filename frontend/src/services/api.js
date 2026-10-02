@@ -58,7 +58,10 @@ api.interceptors.response.use(
 );
 
 export function getErrorMessage(error, fallback = 'Algo deu errado. Tente novamente.') {
-  if (error?.response?.data?.error) return error.response.data.error;
+  const response = error?.response;
+  if (response?.data?.error) return response.data.error;
+  if (response?.status === 429) return 'Muitas tentativas. Aguarde um minuto e tente novamente.';
+  if (response) return fallback;
   if (error?.request) return 'Sem conexão com o servidor. Verifique sua internet.';
   return fallback;
 }

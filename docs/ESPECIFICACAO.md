@@ -542,18 +542,20 @@ Retorna os números do período atual:
 
 ## 10. Segurança
 
-- [ ] Senhas com `bcrypt`.
-- [ ] JWT com expiração.
-- [ ] Rotas protegidas por middleware de autenticação.
-- [ ] Toda consulta de gasto filtrada pelo `userId` do token (um usuário nunca acessa gasto de outro).
-- [ ] Validação dos dados recebidos pela API.
-- [ ] CORS liberado somente para o domínio do frontend.
-- [ ] Variáveis sensíveis somente via `.env`.
-- [ ] Nunca registrar senhas ou tokens em logs.
-- [ ] Nunca retornar informações sensíveis (ex.: `passwordHash`, stack traces).
-- [ ] HTTPS em produção.
-- [ ] Banco de dados **sem porta exposta** para a internet (porta publicada somente em `127.0.0.1`).
-- [ ] Limite de tentativas de login por IP, configurado no Nginx (`limit_req`), para dificultar ataques de força bruta.
+- [x] Senhas com `bcrypt`.
+- [x] JWT com expiração.
+- [x] Rotas protegidas por middleware de autenticação.
+- [x] Toda consulta de gasto filtrada pelo `userId` do token (um usuário nunca acessa gasto de outro).
+- [x] Validação dos dados recebidos pela API.
+- [x] CORS desativado em produção (frontend e API na mesma origem); em desenvolvimento, liberado só para as origens de `CORS_ORIGIN`.
+- [x] Variáveis sensíveis somente via `.env`.
+- [x] Nunca registrar senhas ou tokens em logs.
+- [x] Nunca retornar informações sensíveis (ex.: `passwordHash`, stack traces).
+- [x] HTTPS em produção (Nginx da VPS + Certbot; ver README).
+- [x] Banco de dados e app **sem porta exposta** para a internet (portas publicadas somente em `127.0.0.1`).
+- [x] Limite de tentativas de login por IP no Nginx do container: 5 por minuto, com folga de 5 seguidas; acima disso responde `429`.
+- [x] Cabeçalhos de segurança (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`) e corpo de requisição limitado a 16 KB no Nginx.
+- [x] Containers da API rodando com usuário sem privilégios (`node`).
 
 ---
 
@@ -591,126 +593,90 @@ A interface deve:
 
 ## 12. Infraestrutura (Docker, Nginx e deploy)
 
-### Docker Compose
+> O passo a passo completo de instalação, deploy, comandos, migrations e backup está no [README](../README.md).
 
-Serviços: `frontend`, `backend` e `postgres`.
-
-```yaml
-services:
-  frontend:
-    build: ./frontend
-    restart: unless-stopped
-
-  backend:
-    build: ./backend
-    restart: unless-stopped
-    env_file: .env
-    depends_on:
-      - postgres
-
-  postgres:
-    image: postgres:16
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
-```
-
-- Os dados do banco persistem no volume `postgres_data`.
-- `restart: unless-stopped` garante que os containers voltem após reinício.
-- Credenciais do banco somente via variáveis de ambiente.
-
-### Nginx
-
-Em produção, o Nginx atua como reverse proxy:
+### Arquitetura de produção
 
 ```text
-https://gastos.seudominio.com
-             |
-             v
-           Nginx
-         /       \
-   /api/*         /*
-     |             |
-  backend      frontend
+Internet ──HTTPS──► Nginx da VPS (Certbot) ──► 127.0.0.1:8080
+                                                   │
+                         ┌──────── Docker Compose ─┴──────────────┐
+                         │ frontend  Nginx: build do React        │
+                         │           /api/* ──► backend:3000      │
+                         │ backend   Express + Prisma             │
+                         │ postgres  PostgreSQL 16 (volume)       │
+                         └────────────────────────────────────────┘
 ```
 
-O HTTPS será configurado depois com **Let's Encrypt** (Certbot).
+- **Nginx da VPS** (instalado no servidor, fora do Docker): termina o HTTPS com Let's Encrypt (`certbot --nginx`) e encaminha tudo para `127.0.0.1:8080`. Exemplo em `deploy/nginx-vps.conf`. Fica fora do Docker para simplificar a emissão e renovação do certificado e permitir outros sites na mesma VPS.
+- **Container `frontend`** (Nginx): serve o build do React, devolve `index.html` para as rotas do app, repassa `/api/*` ao backend, limita tentativas de login e adiciona cabeçalhos de segurança. Configuração em `frontend/nginx.conf`.
+- **Container `backend`**: sem porta publicada (só a rede interna do Docker). Ao iniciar, aplica as migrations pendentes (`prisma migrate deploy`) e sobe a API.
+- **Container `postgres`**: dados no volume `postgres_data`; porta publicada só em `127.0.0.1`, para backups e acesso local.
 
-### Deploy na VPS
+### Docker Compose
 
-```bash
-git clone <url-do-repositorio>
-cd BotaNaConta
-cp .env.example .env   # e preencher os valores
-docker compose up -d --build
-```
+- Serviços: `postgres`, `backend` e `frontend`, todos com `restart: unless-stopped` e healthcheck.
+- Ordem de subida: `postgres` saudável → `backend` saudável → `frontend`.
+- As variáveis vêm do `.env` da raiz; o Compose recusa subir se faltar `POSTGRES_*` ou `JWT_SECRET`.
+- A `DATABASE_URL` do backend é montada pelo Compose a partir das variáveis `POSTGRES_*`.
+- Em desenvolvimento, é possível subir só o banco: `docker compose up -d postgres`.
 
-### Comandos úteis
+### Imagens
 
-```bash
-docker compose build          # gera as imagens
-docker compose up -d          # sobe os serviços em segundo plano
-docker compose down           # derruba os serviços (dados permanecem no volume)
-docker compose logs -f        # acompanha os logs
-
-# Prisma
-docker compose exec backend npx prisma migrate deploy   # aplica migrations (produção)
-docker compose exec backend npx prisma db seed          # cria categorias e usuário inicial
-npx prisma migrate dev --name <nome>                    # cria nova migration (desenvolvimento)
-```
+| Serviço    | Base                                   | Observações                                             |
+| ---------- | -------------------------------------- | ------------------------------------------------------- |
+| `backend`  | `node:22-bookworm-slim` + OpenSSL      | Roda como usuário `node`; inclui o CLI do Prisma para as migrations. |
+| `frontend` | build em `node:22-bookworm-slim`, servido por `nginx:stable-alpine` | Arquivos com hash em cache por 1 ano; `index.html` sem cache; gzip. |
 
 ---
 
 ## 13. Variáveis de ambiente
 
-`.env.example`:
+| Arquivo        | Uso                                        |
+| -------------- | ------------------------------------------ |
+| `.env`         | Stack completa no Docker Compose           |
+| `backend/.env` | Backend rodando fora do Docker (`npm run dev`) |
+
+`.env.example` da raiz:
 
 ```env
-# Banco
 POSTGRES_USER=gastos
-POSTGRES_PASSWORD=troque-esta-senha
+POSTGRES_PASSWORD=troque-esta-senha   # só letras e números
 POSTGRES_DB=gastos
-DATABASE_URL=postgresql://gastos:troque-esta-senha@postgres:5432/gastos
+POSTGRES_PORT=5432
 
-# API
-PORT=3000
-JWT_SECRET=uma-chave-secreta-forte
+JWT_SECRET=troque-por-uma-chave-aleatoria-com-pelo-menos-32-caracteres
 JWT_EXPIRES_IN=7d
-CORS_ORIGIN=https://gastos.seudominio.com
+APP_TIMEZONE=America/Sao_Paulo
 
-# Usuário inicial (usado pelo seed)
+APP_PORT=8080
+
 SEED_USER_NAME=Anderson
 SEED_USER_EMAIL=usuario@email.com
 SEED_USER_PASSWORD=troque-esta-senha
-
-# Frontend
-VITE_API_URL=/api
 ```
 
-- **Nunca versionar o `.env`** (incluir no `.gitignore`).
-- Versionar apenas o `.env.example`.
+- **Nunca versionar o `.env`** (já está no `.gitignore`). Versionar apenas os `.env.example`.
+- O frontend usa `VITE_API_URL` (padrão `/api`), definido em tempo de build; não precisa ser alterado quando frontend e API estão no mesmo domínio.
 
 ---
 
 ## 14. Entregáveis
 
-- [ ] `Dockerfile` do frontend
-- [ ] `Dockerfile` do backend
-- [ ] `docker-compose.yml`
-- [ ] `.env.example`
-- [ ] Prisma schema
-- [ ] Prisma seed (categorias + usuário inicial)
-- [ ] Configuração do Nginx
-- [ ] `README.md` com:
-  - [ ] instruções de instalação;
-  - [ ] como executar localmente;
-  - [ ] como executar na VPS;
-  - [ ] comandos do Docker Compose (`build`, `up -d`, `down`, `logs`);
-  - [ ] como executar as migrations do Prisma.
+- [x] `Dockerfile` do frontend
+- [x] `Dockerfile` do backend
+- [x] `docker-compose.yml`
+- [x] `.env.example`
+- [x] Prisma schema
+- [x] Prisma seed (categorias + usuário inicial)
+- [x] Configuração do Nginx (container e VPS)
+- [x] `README.md` com:
+  - [x] instruções de instalação;
+  - [x] como executar localmente;
+  - [x] como executar na VPS;
+  - [x] comandos do Docker Compose (`build`, `up -d`, `down`, `logs`);
+  - [x] como executar as migrations do Prisma;
+  - [x] backup e restauração do banco.
 
 ---
 
