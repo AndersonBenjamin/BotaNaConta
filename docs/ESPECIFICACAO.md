@@ -373,13 +373,14 @@ Total           R$ 2.845,90
 - Base: `/api`
 - Formato: JSON
 - Rotas marcadas com 🔒 exigem `Authorization: Bearer <token>`.
-- Valores monetários: enviados como número (`35.90`); a API deve convertê-los para `Decimal` e pode devolvê-los como string (`"35.90"`) para não perder precisão.
+- Valores monetários: enviados como número (`35.90`) ou texto com ponto (`"35.90"`); a API converte para `Decimal` e **sempre devolve como texto com 2 casas** (`"35.90"`) para não perder precisão. O frontend formata para `R$ 35,90`.
 - Datas: formato `YYYY-MM-DD`.
 
 ### Resumo dos endpoints
 
 | Método | Rota                   | Auth | Descrição                          |
 | ------ | ---------------------- | ---- | ---------------------------------- |
+| GET    | `/api/health`          |      | Verificação de saúde (Docker)      |
 | POST   | `/api/auth/login`      |      | Autentica e retorna o JWT          |
 | GET    | `/api/me`              | 🔒   | Dados do usuário autenticado       |
 | GET    | `/api/categories`      | 🔒   | Lista as categorias                |
@@ -390,7 +391,7 @@ Total           R$ 2.845,90
 | DELETE | `/api/expenses/:id`    | 🔒   | Exclui um gasto                    |
 | GET    | `/api/dashboard`       | 🔒   | Totais e gastos recentes           |
 
-> `GET /api/categories` foi incluído porque o frontend precisa da lista para montar os botões de categoria.
+> `GET /api/categories` foi incluído porque o frontend precisa da lista para montar os botões de categoria. Retorna `[{ "id": 1, "name": "Alimentação", "icon": "🍔" }, ...]`.
 
 ### `POST /api/auth/login`
 
@@ -416,7 +417,7 @@ Response `200`:
 }
 ```
 
-Response `401`: credenciais inválidas (mensagem genérica, sem indicar se o erro foi no e-mail ou na senha).
+Response `401`: credenciais inválidas (mensagem genérica, sem indicar se o erro foi no e-mail ou na senha). O e-mail é comparado sem diferenciar maiúsculas e ignorando espaços nas pontas.
 
 ### `GET /api/me` 🔒
 
@@ -449,18 +450,33 @@ Retorna somente os gastos do usuário autenticado, ordenados por `date` desc e `
 
 Validações:
 
-- `amount`: obrigatório, número > 0, no máximo 2 casas decimais.
+- `amount`: obrigatório, > 0, no máximo 2 casas decimais, até `99999999.99`.
 - `categoryId`: obrigatório, deve existir.
-- `description`: opcional, texto com tamanho máximo definido (ex.: 255).
-- `date`: opcional (padrão: hoje), data válida.
+- `description`: opcional, até 255 caracteres; espaços nas pontas são removidos e texto vazio vira `null`.
+- `date`: opcional (padrão: hoje no fuso da aplicação), data existente no formato `YYYY-MM-DD`.
 
-Response `201`: gasto criado.
+Response `201`:
+
+```json
+{
+  "id": 1,
+  "amount": "35.90",
+  "description": "Almoço",
+  "date": "2026-10-02",
+  "category": { "id": 1, "name": "Alimentação", "icon": "🍔" },
+  "createdAt": "2026-10-02T16:30:08.278Z",
+  "updatedAt": "2026-10-02T16:30:08.278Z"
+}
+```
+
+Todas as rotas de gastos devolvem os gastos neste formato.
 
 ### `GET /api/expenses/:id` · `PUT /api/expenses/:id` · `DELETE /api/expenses/:id` 🔒
 
-- `PUT` aceita o mesmo corpo do `POST`.
+- `PUT` aceita o mesmo corpo do `POST`, mas com `date` **obrigatória** (é uma substituição completa).
 - `DELETE` responde `204`.
 - Se o gasto não existir **ou pertencer a outro usuário**, responder `404`.
+- ID que não seja número inteiro positivo responde `400`.
 
 ### `GET /api/dashboard` 🔒
 
@@ -468,14 +484,20 @@ Retorna os números do período atual:
 
 ```json
 {
-  "totalMonth": 2845.90,
-  "totalToday": 87.50,
+  "today": "2026-10-02",
+  "month": "2026-10",
+  "totalToday": "87.50",
+  "totalMonth": "2845.90",
   "recentExpenses": [],
   "byCategory": [
-    { "categoryId": 1, "name": "Alimentação", "total": 650.00 }
+    { "categoryId": 1, "name": "Alimentação", "icon": "🍔", "total": "650.00" }
   ]
 }
 ```
+
+- `today` e `month` informam a data de referência usada pela API, para o frontend exibir o mês e montar os filtros sem depender do relógio do celular.
+- `recentExpenses`: os 10 gastos mais recentes.
+- `byCategory`: total do mês por categoria, do maior para o menor; categorias sem gastos no mês não aparecem.
 
 > "Hoje" e "este mês" devem ser calculados no fuso **America/Sao_Paulo**, para evitar que gastos feitos à noite caiam no dia seguinte.
 
@@ -483,16 +505,21 @@ Retorna os números do período atual:
 
 ```json
 {
-  "error": "Mensagem legível",
-  "details": []
+  "error": "Dados inválidos.",
+  "details": [
+    { "field": "amount", "message": "Informe um valor maior que zero, com até 2 casas decimais." }
+  ]
 }
 ```
 
+`details` só aparece em erros de validação, com um item por campo inválido, para o frontend mostrar a mensagem ao lado de cada campo.
+
 | Código | Uso                                       |
 | ------ | ----------------------------------------- |
-| 400    | Dados inválidos                           |
+| 400    | Dados inválidos ou JSON malformado        |
 | 401    | Não autenticado / token inválido/expirado |
-| 404    | Recurso não encontrado                    |
+| 404    | Recurso ou rota não encontrados           |
+| 413    | Corpo da requisição maior que 10 KB       |
 | 500    | Erro interno (sem expor stack trace)      |
 
 ---
@@ -510,6 +537,7 @@ Retorna os números do período atual:
 - [ ] Nunca retornar informações sensíveis (ex.: `passwordHash`, stack traces).
 - [ ] HTTPS em produção.
 - [ ] Banco de dados **sem porta exposta** para a internet (porta publicada somente em `127.0.0.1`).
+- [ ] Limite de tentativas de login por IP, configurado no Nginx (`limit_req`), para dificultar ataques de força bruta.
 
 ---
 
