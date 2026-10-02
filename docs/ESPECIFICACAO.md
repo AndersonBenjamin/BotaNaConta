@@ -95,10 +95,10 @@ E terminar o lançamento em poucos segundos.
 
 | Camada         | Tecnologia                                                        |
 | -------------- | ----------------------------------------------------------------- |
-| Frontend       | React, Vite, JavaScript ou TypeScript, React Router, Axios        |
-| Estilo         | CSS responsivo ou Tailwind CSS *(estética ainda a definir)*       |
-| Backend        | Node.js, Express                                                  |
-| ORM            | Prisma                                                            |
+| Frontend       | React, Vite, JavaScript, React Router, Axios                      |
+| Estilo         | CSS puro com variáveis *(estética ainda a definir)*               |
+| Backend        | Node.js 22+, Express (JavaScript, ES Modules)                     |
+| ORM            | Prisma 6 (o 7 gera cliente em TypeScript)                         |
 | Autenticação   | JWT + bcrypt                                                      |
 | Banco de dados | PostgreSQL 16                                                     |
 | Infraestrutura | Docker, Docker Compose, Nginx, HTTPS com Let's Encrypt            |
@@ -204,6 +204,7 @@ User 1 ──── N Expense N ──── 1 Category
 | ----------- | -------- | ---------------------- |
 | `id`        | Int (PK) | Autoincremento         |
 | `name`      | String   | Obrigatório, único     |
+| `icon`      | String?  | Emoji da categoria     |
 | `createdAt` | DateTime | Automático             |
 
 Categorias iniciais (criadas via seed):
@@ -221,7 +222,7 @@ Categorias iniciais (criadas via seed):
 | 🧾    | Contas       |
 | 📦    | Outros       |
 
-> Os emojis podem ficar no frontend (mapa por nome) ou ganhar um campo `icon` na tabela — decidir na implementação.
+> Os emojis ficam no campo `icon` da tabela, preenchido pelo seed.
 
 ### `expenses`
 
@@ -508,7 +509,7 @@ Retorna os números do período atual:
 - [ ] Nunca registrar senhas ou tokens em logs.
 - [ ] Nunca retornar informações sensíveis (ex.: `passwordHash`, stack traces).
 - [ ] HTTPS em produção.
-- [ ] Banco de dados **sem porta exposta** para a internet (acesso só pela rede interna do Docker).
+- [ ] Banco de dados **sem porta exposta** para a internet (porta publicada somente em `127.0.0.1`).
 
 ---
 
