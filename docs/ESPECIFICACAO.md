@@ -204,25 +204,25 @@ User 1 ──── N Expense N ──── 1 Category
 | ----------- | -------- | ---------------------- |
 | `id`        | Int (PK) | Autoincremento         |
 | `name`      | String   | Obrigatório, único     |
-| `icon`      | String?  | Emoji da categoria     |
+| `icon`      | String?  | Nome do ícone          |
 | `createdAt` | DateTime | Automático             |
 
 Categorias iniciais (criadas via seed):
 
-| Emoji | Categoria    |
-| ----- | ------------ |
-| 🍔    | Alimentação  |
-| 🛒    | Mercado      |
-| 🚗    | Transporte   |
-| 🏠    | Casa         |
-| 💊    | Saúde        |
-| 🎮    | Lazer        |
-| 🛍️    | Compras      |
-| 💳    | Assinaturas  |
-| 🧾    | Contas       |
-| 📦    | Outros       |
+| Ícone      | Categoria    |
+| ---------- | ------------ |
+| `utensils` | Alimentação  |
+| `cart`     | Mercado      |
+| `car`      | Transporte   |
+| `home`     | Casa         |
+| `pill`     | Saúde        |
+| `game`     | Lazer        |
+| `bag`      | Compras      |
+| `repeat`   | Assinaturas  |
+| `receipt`  | Contas       |
+| `box`      | Outros       |
 
-> Os emojis ficam no campo `icon` da tabela, preenchido pelo seed.
+> O campo `icon` guarda o nome de um ícone SVG desenhado pelo frontend (`frontend/src/components/Icon.jsx`), preenchido pelo seed. Bancos com os emojis antigos continuam funcionando: o frontend escolhe o ícone pelo nome da categoria, e rodar o seed de novo atualiza o campo.
 
 ### `expenses`
 
@@ -307,29 +307,35 @@ Esse fluxo deve ser **extremamente rápido** e exigir poucos toques.
 Tela exibida após o login.
 
 ```text
-Olá, Anderson
+Boa tarde, Anderson                [sair] [+]
+Meus Gastos
+Outubro de 2026
 
-OUTUBRO
+[Mercado] [Contas] [Lazer] [Assinaturas]     ← categorias com mais gastos
 
-Hoje               Este mês
-R$ 87,50           R$ 2.845,90
+┌ Gasto no mês ──┐ ┌ Hoje ──────────┐
+│ R$ 2.845,90    │ │ R$ 87,50       │
+│ ╱╲_╱‾ (gráfico)│ │ (3% do mês)    │
+└────────────────┘ └────────────────┘
+┌ Maior categoria┐ ┌ Média por dia ─┐
+│ R$ 650         │ │ R$ 569,18      │
+│ ▓▓▓▓░░░░       │ │ Projeção: ...  │
+└────────────────┘ └────────────────┘
 
-──────────────────────────────
-Gastos recentes
-
-🍔 Almoço                R$ 35,90
-🛒 Mercado              R$ 120,50
-🚗 Combustível           R$ 80,00
-
-      [ + Novo gasto ]
+Últimos gastos                    Ver todos
+(ícone) Almoço        Alimentação · hoje   − R$ 35,90
+(ícone) Mercado       Mercado · ontem     − R$ 120,50
 ```
+
+- Os atalhos de categoria abrem a lista do mês filtrada por ela.
+- Os quatro cards usam apenas dados do mês: total com mini-gráfico dos gastos por dia, gasto de hoje (e quanto representa do mês), categoria com maior gasto e média diária com a projeção para o mês inteiro.
 
 ### 8.3 Novo gasto *(tela principal)*
 
 | Campo       | Comportamento                                                                 |
 | ----------- | ----------------------------------------------------------------------------- |
 | Valor       | Formato `R$ 35,90`, com **dígitos entrando pela direita** (digitar `3590` mostra `35,90`), então só precisa do **teclado numérico** (`inputmode="numeric"`). Foco automático ao abrir a tela e de novo se o salvamento falhar por falta de valor. |
-| Categoria   | Grade de botões com emoji.                                                     |
+| Categoria   | Grade de botões com ícone e nome; a selecionada fica em verde-limão.           |
 | Descrição   | Opcional. Ex.: `Almoço`.                                                       |
 | Data        | Preenchida com a data atual; pode ser alterada.                                |
 | Botão       | **Adicionar gasto**                                                            |
@@ -351,17 +357,17 @@ A mesma tela/formulário é reaproveitada para **editar** um gasto, com opção 
 
 ```text
 02 OUT
-  🍔 Almoço              R$ 35,90
-  🛒 Mercado            R$ 120,50
+  (ícone) Almoço        − R$ 35,90
+  (ícone) Mercado      − R$ 120,50
 
 01 OUT
-  🚗 Combustível         R$ 80,00
+  (ícone) Combustível   − R$ 80,00
 ```
 
 ### 8.5 Filtros
 
 - **Período:** Hoje · Esta semana · Este mês *(padrão)* · Mês anterior
-- **Categoria:** seleção de uma categoria (ou todas)
+- **Categoria:** fileira de botões com ícone, rolável na horizontal (ou "Todas")
 - A semana vai de segunda a domingo. Os períodos são calculados no fuso America/Sao_Paulo, o mesmo da API.
 - Os filtros ficam na URL, para continuarem aplicados ao voltar da edição.
 
@@ -506,7 +512,10 @@ Retorna os números do período atual:
   "totalMonth": "2845.90",
   "recentExpenses": [],
   "byCategory": [
-    { "categoryId": 1, "name": "Alimentação", "icon": "🍔", "total": "650.00" }
+    { "categoryId": 1, "name": "Alimentação", "icon": "utensils", "total": "650.00" }
+  ],
+  "byDay": [
+    { "date": "2026-10-01", "total": "120.00" }
   ]
 }
 ```
@@ -514,6 +523,7 @@ Retorna os números do período atual:
 - `today` e `month` informam a data de referência usada pela API nos totais; o frontend usa `month` para exibir o nome do mês.
 - `recentExpenses`: os 10 gastos mais recentes.
 - `byCategory`: total do mês por categoria, do maior para o menor; categorias sem gastos no mês não aparecem.
+- `byDay`: total de cada dia do mês que teve gastos, em ordem de data (usado no mini-gráfico do dashboard; os dias sem gastos são completados com zero pelo frontend).
 
 > "Hoje" e "este mês" devem ser calculados no fuso **America/Sao_Paulo**, para evitar que gastos feitos à noite caiam no dia seguinte.
 
@@ -561,7 +571,7 @@ Retorna os números do período atual:
 
 ## 11. Interface mobile
 
-Prioridade para celular, com largura de referência entre **360px e 430px**. A estética definitiva (cores, fontes) ainda será escolhida; por enquanto há um visual neutro com todas as cores, raios e espaçamentos em variáveis CSS no início de `frontend/src/styles/global.css`, incluindo um **modo escuro** que segue a configuração do celular. Em telas maiores, o conteúdo fica centralizado com até 480px.
+Prioridade para celular, com largura de referência entre **360px e 430px**. O visual é escuro (fundo `#0e0e10`, cards `#1a1a1d`) com destaque **verde-limão** (`#d8f25b`), fonte **Archivo** (títulos em itálico, servida pelo próprio app via `@fontsource/archivo`) e ícones de linha em SVG, sem emojis. Cores, raios e espaçamentos ficam em variáveis CSS no início de `frontend/src/styles/global.css`. Em telas maiores, o conteúdo fica centralizado com até 480px.
 
 A interface deve:
 
@@ -580,7 +590,7 @@ A interface deve:
 │          CONTEÚDO           │
 │                             │
 ├─────────────────────────────┤
-│  🏠       ＋       📊       │
+│ (casa)    [＋]   (gráfico)  │
 │ Início   Gasto   Resumo     │
 └─────────────────────────────┘
 ```

@@ -1,5 +1,5 @@
 import { prisma } from '../utils/prisma.js';
-import { monthRange, toDbDate, today } from '../utils/dates.js';
+import { fromDbDate, monthRange, toDbDate, today } from '../utils/dates.js';
 import { categorySelect } from './categoryService.js';
 import { expenseInclude, expenseOrder, formatMoney, serializeExpense } from './expenseService.js';
 
@@ -10,7 +10,7 @@ export async function getDashboard(userId) {
   const { start, end } = monthRange(day);
   const monthWhere = { userId, date: { gte: start, lt: end } };
 
-  const [todaySum, monthSum, recent, byCategory, categories] = await Promise.all([
+  const [todaySum, monthSum, recent, byCategory, byDay, categories] = await Promise.all([
     prisma.expense.aggregate({
       where: { userId, date: toDbDate(day) },
       _sum: { amount: true },
@@ -26,6 +26,12 @@ export async function getDashboard(userId) {
       by: ['categoryId'],
       where: monthWhere,
       _sum: { amount: true },
+    }),
+    prisma.expense.groupBy({
+      by: ['date'],
+      where: monthWhere,
+      _sum: { amount: true },
+      orderBy: { date: 'asc' },
     }),
     prisma.category.findMany({ select: categorySelect }),
   ]);
@@ -49,5 +55,10 @@ export async function getDashboard(userId) {
           total: formatMoney(group._sum.amount),
         };
       }),
+    // Só os dias do mês que têm gastos; o frontend completa os demais com zero.
+    byDay: byDay.map((group) => ({
+      date: fromDbDate(group.date),
+      total: formatMoney(group._sum.amount),
+    })),
   };
 }

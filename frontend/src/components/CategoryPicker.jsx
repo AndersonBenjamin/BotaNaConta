@@ -1,18 +1,20 @@
+import { CategoryIcon } from './Icon.jsx';
+
 export default function CategoryPicker({ categories, value, onChange, labelledBy }) {
   return (
-    <div className="category-picker" role="group" aria-labelledby={labelledBy}>
+    <div className="cats" role="group" aria-labelledby={labelledBy}>
       {categories.map((category) => {
         const selected = category.id === value;
         return (
           <button
             key={category.id}
             type="button"
-            className={`category-option${selected ? ' is-selected' : ''}`}
+            className={`cat${selected ? ' cat--active' : ''}`}
             aria-pressed={selected}
             onClick={() => onChange(category.id)}
           >
-            <span className="category-option__icon" aria-hidden="true">{category.icon}</span>
-            <span className="category-option__name">{category.name}</span>
+            <CategoryIcon category={category} />
+            <span className="cat__label">{category.name}</span>
           </button>
         );
       })}

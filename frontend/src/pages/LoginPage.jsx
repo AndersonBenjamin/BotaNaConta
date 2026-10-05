@@ -31,6 +31,7 @@ export default function LoginPage() {
     <main className="login">
       <div className="login__brand">
         <span className="login__logo" aria-hidden="true">R$</span>
+        <span className="page-header__eyebrow">Bem-vindo de volta</span>
         <h1>BotaNaConta</h1>
         <p>Seus gastos, anotados em segundos.</p>
       </div>

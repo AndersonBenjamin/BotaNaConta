@@ -3,17 +3,18 @@ import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+// icon: nome do ícone desenhado pelo frontend (src/components/Icon.jsx).
 const categories = [
-  { name: 'Alimentação', icon: '🍔' },
-  { name: 'Mercado', icon: '🛒' },
-  { name: 'Transporte', icon: '🚗' },
-  { name: 'Casa', icon: '🏠' },
-  { name: 'Saúde', icon: '💊' },
-  { name: 'Lazer', icon: '🎮' },
-  { name: 'Compras', icon: '🛍️' },
-  { name: 'Assinaturas', icon: '💳' },
-  { name: 'Contas', icon: '🧾' },
-  { name: 'Outros', icon: '📦' },
+  { name: 'Alimentação', icon: 'utensils' },
+  { name: 'Mercado', icon: 'cart' },
+  { name: 'Transporte', icon: 'car' },
+  { name: 'Casa', icon: 'home' },
+  { name: 'Saúde', icon: 'pill' },
+  { name: 'Lazer', icon: 'game' },
+  { name: 'Compras', icon: 'bag' },
+  { name: 'Assinaturas', icon: 'repeat' },
+  { name: 'Contas', icon: 'receipt' },
+  { name: 'Outros', icon: 'box' },
 ];
 
 async function seedCategories() {

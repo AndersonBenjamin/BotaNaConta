@@ -7,6 +7,7 @@ import { formatCents, toCents } from '../utils/money.js';
 import ExpenseList from '../components/ExpenseList.jsx';
 import Loading from '../components/Loading.jsx';
 import ErrorState from '../components/ErrorState.jsx';
+import Icon, { CategoryIcon } from '../components/Icon.jsx';
 
 const DEFAULT_PERIOD = 'mes';
 
@@ -36,7 +37,10 @@ export default function ExpensesPage() {
   return (
     <>
       <header className="page-header">
-        <h1>Gastos</h1>
+        <div className="page-header__titles">
+          <span className="page-header__eyebrow">Histórico</span>
+          <h1>Gastos</h1>
+        </div>
       </header>
 
       <div className="filters">
@@ -54,21 +58,32 @@ export default function ExpensesPage() {
           ))}
         </div>
 
-        <label className="visually-hidden" htmlFor="category-filter">
-          Categoria
-        </label>
-        <select
-          id="category-filter"
-          value={categoryId}
-          onChange={(event) => setFilter('categoria', event.target.value)}
-        >
-          <option value="">Todas as categorias</option>
-          {categories.data?.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.icon} {category.name}
-            </option>
-          ))}
-        </select>
+        <div className="cats cats--scroll" role="group" aria-label="Categoria">
+          <button
+            type="button"
+            className={`cat${categoryId === '' ? ' cat--active' : ''}`}
+            aria-pressed={categoryId === ''}
+            onClick={() => setFilter('categoria', '')}
+          >
+            <Icon name="list" />
+            <span className="cat__label">Todas</span>
+          </button>
+          {categories.data?.map((category) => {
+            const selected = String(category.id) === categoryId;
+            return (
+              <button
+                key={category.id}
+                type="button"
+                className={`cat${selected ? ' cat--active' : ''}`}
+                aria-pressed={selected}
+                onClick={() => setFilter('categoria', String(category.id))}
+              >
+                <CategoryIcon category={category} />
+                <span className="cat__label">{category.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {error && <ErrorState error={error} onRetry={reload} />}

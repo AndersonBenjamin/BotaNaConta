@@ -15,6 +15,7 @@ import AmountInput from '../components/AmountInput.jsx';
 import CategoryPicker from '../components/CategoryPicker.jsx';
 import Loading from '../components/Loading.jsx';
 import ErrorState from '../components/ErrorState.jsx';
+import Icon from '../components/Icon.jsx';
 
 // A mesma rota serve para "novo" e "editar". A key recria o formulário ao trocar de gasto.
 export default function ExpenseFormPage() {
@@ -239,11 +240,14 @@ function PageTitle({ title, onBack }) {
   return (
     <header className="page-header">
       {onBack && (
-        <button type="button" className="button button--ghost button--icon" onClick={onBack} aria-label="Voltar">
-          ←
+        <button type="button" className="icon-button" onClick={onBack} aria-label="Voltar">
+          <Icon name="back" />
         </button>
       )}
-      <h1>{title}</h1>
+      <div className="page-header__titles">
+        <span className="page-header__eyebrow">Meus Gastos</span>
+        <h1>{title}</h1>
+      </div>
     </header>
   );
 }
